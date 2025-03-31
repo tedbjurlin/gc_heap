@@ -1,10 +1,13 @@
 [package]
-name = "gc_heap"
-version = "0.1.0"
+name = "gc_heap_template"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = { version = "1.0", default-features = false }
 gc_headers = {git = "https://github.com/gjf2a/gc_headers"}
-bare_metal_queue = {git = "https://github.com/gjf2a/bare_metal_queue"}
+
+[dev-dependencies]
+test_tracer = {git = "https://github.com/gjf2a/test_tracer"}
