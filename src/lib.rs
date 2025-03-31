@@ -66,11 +66,11 @@ impl<const MAX_BLOCKS: usize> BlockTable<MAX_BLOCKS> {
         todo!("Find the address, i.e., start + offset, for the Pointer `p`");
         // Outline
         //
-        // 1. If p has a block number not present in the array, report IllegalBlock.
+        // 1. If p has a block number that would be an illegal array access, report IllegalBlock.
         // 2. If p's block has a `None` entry, report UnallocatedBlock.
         // 3. If p's block has an offset that exceeds the size of our block, report OffsetTooBig.
         // 4. If p's block size is different than our block in the table, report MisalignedPointer.
-        // 5. Return the start plus the offset.
+        // 5. If none of those errors arises, return the start plus the offset.
     }
 
     fn allocated_block_ptr(&self, block: usize) -> Option<Pointer> {
@@ -262,7 +262,7 @@ impl<const HEAP_SIZE: usize, const MAX_BLOCKS: usize> GarbageCollectingHeap
         //    * If none are available, perform a collection.
         //    * If none are still available, report out of blocks.
         // 2. Perform a malloc in the currently active heap.
-        //    * If no space is available, perform a collection.
+        //    * If no space is available, perform a collection by calling self.collect().
         //    * If no space is still available, report out of memory.
         // 3. Create entry in the block table for the newly allocated block.
         // 4. Return a pointer to the newly allocated block.
@@ -343,7 +343,7 @@ impl<const HEAP_SIZE: usize, const MAX_BLOCKS: usize, const MAX_COPIES: usize>
         //      * You'll need a variable to track whether you have already performed a generation 1 collection.
         //      * If so, just return the error - multiple generation 1 collections will not be productive
         //      * If not, copy into the active generation 1 heap.
-        //      * If that heap is out of space, perform a generation 1 collection.
+        //      * If that heap is out of space, perform a generation 1 collection by calling self.collect_gen_1().
         //      * After the generation 1 collection, try copying it into the inactive generation 1 heap.
         //    * If not, copy it into the inactive generation 0 heap.
         // 3. Clear the active generation 0 heap.
@@ -426,10 +426,10 @@ impl<const HEAP_SIZE: usize, const MAX_BLOCKS: usize, const MAX_COPIES: usize> G
         // Outline
         //
         // 1. Find an available block number
-        //    * If none are available, perform a collection.
+        //    * If none are available, perform a collection by calling self.collect_gen_0().
         //    * If none are still available, report out of blocks.
         // 2. Perform a generation zero malloc.
-        //    * If no space is available, perform a collection.
+        //    * If no space is available, perform a collection by calling self.collect_gen_0().
         //    * If no space is still available, report out of memory.
         // 3. Create entry in the block table for the newly allocated block.
         // 4. Return a pointer to the newly allocated block.
@@ -453,6 +453,33 @@ mod tests {
     const MAX_BLOCKS: usize = 12;
 
     // Level 1 Unit Tests
+
+    #[test]
+    fn block_table_test() {
+        let mut table = BlockTable::<5>::new();
+        assert_eq!(table.available_block().unwrap(), 0);
+        table[0] = Some(BlockInfo { start: 3, size: 2, num_times_copied: 0 });
+        assert_eq!(table.available_block().unwrap(), 1);
+        table[2] = Some(BlockInfo { start: 5, size: 3, num_times_copied: 0 });
+        assert_eq!(table.available_block().unwrap(), 1);
+        table[1] = Some(BlockInfo { start: 8, size: 2, num_times_copied: 0 });
+        assert_eq!(table.available_block().unwrap(), 3);
+
+        let p = Pointer::new(0, 2);
+        for (i, ptr) in p.iter().enumerate() {
+            assert_eq!(table.address(ptr).unwrap(), i + 3);
+        }
+        let end_ptr = p.iter().last().unwrap();
+        table[0] = Some(BlockInfo {start: 3, size: 1, num_times_copied: 0});
+        assert_eq!(table.address(p), Err(HeapError::MisalignedPointer(2, 1, 0)));
+        assert_eq!(table.address(end_ptr), Err(HeapError::OffsetTooBig(1, 0, 1)));
+
+        let p = Pointer::new(5, 2);
+        assert_eq!(table.address(p), Err(HeapError::IllegalBlock(5, 4)));
+
+        let p = Pointer::new(3, 2);
+        assert_eq!(table.address(p), Err(HeapError::UnallocatedBlock(3)));
+    }
 
     #[test]
     fn basic_allocation_test() {
