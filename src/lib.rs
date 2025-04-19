@@ -244,7 +244,7 @@ impl<const HEAP_SIZE: usize, const MAX_BLOCKS: usize> GarbageCollectingHeap
 
     fn assert_no_strays(&self) {}
 }
-
+#[derive(Copy, Clone)]
 pub struct CopyingHeap<const HEAP_SIZE: usize, const MAX_BLOCKS: usize> {
     heaps: [RamHeap<HEAP_SIZE>; 2],
     block_info: BlockTable<MAX_BLOCKS>,
